@@ -1,0 +1,101 @@
+========================================
+INSTRUKCJA TESTOWANIA SERWERA HTTP (WSL)
+========================================
+
+1. URUCHOMIENIE SERWERA
+------------------------
+Otwórz terminal WSL i przejdź do katalogu z serwerem:
+
+cd /mnt/c/users/mikol/onedrive/pulpit/http-server
+
+Uruchom serwer:
+
+./server 8080 .
+
+Serwer powinien wypisać:
+HTTP server listening on port 8080, root dir: .
+
+Nie zamykaj tego terminala.
+
+
+2. PRZYGOTOWANIE PLIKU index.html
+----------------------------------
+Otwórz drugi terminal WSL i przejdź do katalogu:
+
+cd /mnt/c/users/mikol/onedrive/pulpit/http-server
+
+Utwórz plik:
+
+echo "<h1>Siema z mojego HTTP servera</h1>" > index.html
+
+
+3. TEST GET
+------------
+curl -v http://localhost:8080/
+
+Oczekiwany wynik:
+- HTTP/1.1 200 OK
+- Content-Type: text/html
+- Treść pliku index.html
+
+
+4. TEST HEAD
+-------------
+curl -I http://localhost:8080/
+
+Oczekiwany wynik:
+- HTTP/1.1 200 OK
+- Same nagłówki, bez treści HTML
+
+
+5. TEST PUT (WYSYŁANIE PLIKU)
+------------------------------
+Utwórz plik testowy:
+
+echo "To jest plik wrzucony PUT-em" > plik_put.txt
+
+Wyślij go na serwer jako upload.txt:
+
+curl -v -X PUT --data-binary @plik_put.txt http://localhost:8080/upload.txt
+
+Oczekiwany wynik:
+- HTTP/1.1 201 Created
+- Komunikat "Created"
+
+Sprawdzenie pliku:
+ls
+cat upload.txt
+
+
+6. TEST GET NA PLIKU WYSŁANYM PUT-EM
+-------------------------------------
+curl -v http://localhost:8080/upload.txt
+
+Oczekiwany wynik:
+- HTTP/1.1 200 OK
+- Treść: "To jest plik wrzucony PUT-em"
+
+
+7. TEST DELETE
+---------------
+curl -v -X DELETE http://localhost:8080/upload.txt
+
+Oczekiwany wynik:
+- HTTP/1.1 200 OK
+- Komunikat "Deleted"
+
+Sprawdź usunięcie:
+ls
+
+
+8. TEST GET PO USUNIĘCIU
+--------------------------
+curl -v http://localhost:8080/upload.txt
+
+Oczekiwany wynik:
+- HTTP/1.1 404 Not Found
+
+
+========================================
+KONIEC INSTRUKCJI
+========================================
