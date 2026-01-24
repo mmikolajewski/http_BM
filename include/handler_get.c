@@ -51,7 +51,7 @@ void handle_get_head(int client_fd,
     char header[512];
     int n = snprintf(header, sizeof(header),
                      "HTTP/1.1 200 OK\r\n"
-                     "Server: SimpleCServer/0.1\r\n"
+                     "Server: MegaTurboHiperLinkServer/162364.59233/0.1\r\n"
                      "Connection: close\r\n"
                      "Content-Length: %ld\r\n"
                      "Content-Type: %s\r\n"

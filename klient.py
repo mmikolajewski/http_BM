@@ -88,7 +88,7 @@ def send_request():
 
 # Tworzymy okno główne.
 root = tk.Tk()
-root.title("Prosty klient HTTP (GET/HEAD/PUT/DELETE)")
+root.title("Spoglądator (GET/HEAD/PUT/DELETE)")
 
 # Ramka z parametrami połączenia.
 frame_conn = ttk.LabelFrame(root, text="Połączenie")
