@@ -1,11 +1,14 @@
 // http_server.c
-// Bardzo prosty współbieżny serwer HTTP (GET, HEAD, PUT, DELETE)
-// Linux + C + TCP + pthreads, zgodny w podstawowym zakresie z RFC2616.
+// Praca zaliczeniowa: Sieci komputerowe 2
+// Bartosz Grabski - 59233
+// Mikołaj Mikołajewski - 162364
+
+// Linux + C + TCP + pthreads
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>      // strcasecmp, strncasecmp //kurwa jego mać
+#include <strings.h>      
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
@@ -17,270 +20,15 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#define HEADER_BUF_SIZE 8192
-#define IO_BUF_SIZE     8192
+#include "include/utils.h"
+#include "include/handlers.h"
+#include "include/constants.h"
 
 typedef struct {
     int client_fd;
     char root_dir[PATH_MAX];
 } client_args_t;
 
-static const char *get_mime_type(const char *path) {
-    const char *ext = strrchr(path, '.');
-    if (!ext) return "application/octet-stream";
-    ext++;
-    if (!strcasecmp(ext, "html") || !strcasecmp(ext, "htm")) return "text/html";
-    if (!strcasecmp(ext, "txt")  || !strcasecmp(ext, "log")) return "text/plain";
-    if (!strcasecmp(ext, "jpg")  || !strcasecmp(ext, "jpeg")) return "image/jpeg";
-    if (!strcasecmp(ext, "png")) return "image/png";
-    if (!strcasecmp(ext, "gif")) return "image/gif";
-    if (!strcasecmp(ext, "css")) return "text/css";
-    if (!strcasecmp(ext, "js"))  return "application/javascript";
-    return "application/octet-stream";
-}
-
-static void send_simple_response(int fd,
-                                 int status_code,
-                                 const char *reason,
-                                 const char *content_type,
-                                 const char *body,
-                                 size_t body_len)
-{
-    char header[512];
-    int n = snprintf(header, sizeof(header),
-                     "HTTP/1.1 %d %s\r\n"
-                     "Server: SimpleCServer/0.1\r\n"
-                     "Connection: close\r\n"
-                     "Content-Length: %zu\r\n"
-                     "%s%s\r\n",
-                     status_code, reason,
-                     body_len,
-                     content_type ? "Content-Type: " : "",
-                     content_type ? content_type : "");
-    send(fd, header, n, 0);
-    if (body && body_len > 0) {
-        send(fd, body, body_len, 0);
-    }
-}
-
-static int build_full_path(const char *root_dir,
-                           const char *url_path,
-                           char *out, size_t out_size)
-{
-    // Zakazujemy ".." w ścieżce (bardzo prymitywne "zabezpieczenie").
-    if (strstr(url_path, "..") != NULL) {
-        return -1;
-    }
-
-    char rel[PATH_MAX];
-
-    if (strcmp(url_path, "/") == 0) {
-        // Domyślnie serwujemy index.html
-        snprintf(rel, sizeof(rel), "/index.html");
-    } else {
-        snprintf(rel, sizeof(rel), "%s", url_path);
-    }
-
-    // Sklej root_dir + rel
-    int n = snprintf(out, out_size, "%s%s", root_dir, rel);
-    if (n < 0 || (size_t)n >= out_size) {
-        return -1;
-    }
-    return 0;
-}
-
-static long parse_content_length(const char *headers, const char *headers_end) {
-    const char *p = headers;
-    while (p < headers_end) {
-        const char *line_end = strstr(p, "\r\n");
-        if (!line_end || line_end > headers_end) {
-            break;
-        }
-        if (!strncasecmp(p, "Content-Length:", 15)) {
-            // p + 15 -> dalej będzie liczba
-            const char *num_start = p + 15;
-            while (num_start < line_end && (*num_start == ' ' || *num_start == '\t'))
-                num_start++;
-            char tmp[64];
-            size_t len = (size_t)(line_end - num_start);
-            if (len >= sizeof(tmp)) len = sizeof(tmp) - 1;
-            memcpy(tmp, num_start, len);
-            tmp[len] = '\0';
-            char *endptr = NULL;
-            long val = strtol(tmp, &endptr, 10);
-            if (endptr == tmp) {
-                return -1;
-            }
-            return val;
-        }
-        p = line_end + 2;
-    }
-    return -1; // nie znaleziono
-}
-
-static void handle_get_head(int client_fd,
-                            const char *root_dir,
-                            const char *url_path,
-                            int is_head)
-{
-    char full_path[PATH_MAX];
-    if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0) {
-        const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    struct stat st;
-    if (stat(full_path, &st) < 0) {
-        const char *msg = "Not Found\r\n";
-        send_simple_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    if (!S_ISREG(st.st_mode)) {
-        const char *msg = "Forbidden\r\n";
-        send_simple_response(client_fd, 403, "Forbidden", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    int file_fd = open(full_path, O_RDONLY);
-    if (file_fd < 0) {
-        const char *msg = "Internal Server Error\r\n";
-        send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    const char *mime = get_mime_type(full_path);
-
-    char header[512];
-    int n = snprintf(header, sizeof(header),
-                     "HTTP/1.1 200 OK\r\n"
-                     "Server: SimpleCServer/0.1\r\n"
-                     "Connection: close\r\n"
-                     "Content-Length: %ld\r\n"
-                     "Content-Type: %s\r\n"
-                     "\r\n",
-                     (long)st.st_size,
-                     mime);
-    send(client_fd, header, n, 0);
-
-    if (!is_head) {
-        char buf[IO_BUF_SIZE];
-        ssize_t r;
-        while ((r = read(file_fd, buf, sizeof(buf))) > 0) {
-            ssize_t off = 0;
-            while (off < r) {
-                ssize_t s = send(client_fd, buf + off, r - off, 0);
-                if (s <= 0) {
-                    close(file_fd);
-                    return;
-                }
-                off += s;
-            }
-        }
-    }
-
-    close(file_fd);
-}
-
-static void handle_put(int client_fd,
-                       const char *root_dir,
-                       const char *url_path,
-                       const char *body_start,
-                       size_t body_in_buf,
-                       long content_length)
-{
-    if (content_length < 0) {
-        const char *msg = "Length Required\r\n";
-        send_simple_response(client_fd, 411, "Length Required", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    char full_path[PATH_MAX];
-    if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0) {
-        const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    int existed_before = (access(full_path, F_OK) == 0);
-
-    int fd = open(full_path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-    if (fd < 0) {
-        const char *msg = "Internal Server Error\r\n";
-        send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    long remaining = content_length;
-
-    // Najpierw to, co już mamy w buforze (body_in_buf).
-    if (body_in_buf > 0) {
-        size_t to_write = (body_in_buf > (size_t)remaining) ? (size_t)remaining : body_in_buf;
-        ssize_t w = write(fd, body_start, to_write);
-        if (w < 0) {
-            close(fd);
-            const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
-            return;
-        }
-        remaining -= w;
-    }
-
-    char buf[IO_BUF_SIZE];
-    while (remaining > 0) {
-        ssize_t r = recv(client_fd, buf, (remaining > IO_BUF_SIZE) ? IO_BUF_SIZE : remaining, 0);
-        if (r <= 0) {
-            close(fd);
-            const char *msg = "Bad Request\r\n";
-            send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
-            return;
-        }
-        ssize_t w = write(fd, buf, r);
-        if (w < 0 || w != r) {
-            close(fd);
-            const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
-            return;
-        }
-        remaining -= r;
-    }
-
-    close(fd);
-
-    if (existed_before) {
-        // Nadpisano
-        send_simple_response(client_fd, 200, "OK", "text/plain", "OK\r\n", 4);
-    } else {
-        // Utworzono nowy plik
-        send_simple_response(client_fd, 201, "Created", "text/plain", "Created\r\n", 9);
-    }
-}
-
-static void handle_delete(int client_fd,
-                          const char *root_dir,
-                          const char *url_path)
-{
-    char full_path[PATH_MAX];
-    if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0) {
-        const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
-        return;
-    }
-
-    if (unlink(full_path) == 0) {
-        // 200 OK (można też 204 No Content)
-        send_simple_response(client_fd, 200, "OK", "text/plain", "Deleted\r\n", 9);
-    } else {
-        if (errno == ENOENT) {
-            const char *msg = "Not Found\r\n";
-            send_simple_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
-        } else {
-            const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
-        }
-    }
-}
 
 static void *client_thread(void *arg) {
     client_args_t *cargs = (client_args_t *)arg;
@@ -371,7 +119,7 @@ static void *client_thread(void *arg) {
 
 int main(int argc, char *argv[]) {
     int port = 8080;
-    const char *root_dir = ".";
+    const char *root_dir = "public_html";
 
     if (argc >= 2) {
         port = atoi(argv[1]);
@@ -416,6 +164,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    printf("Server build at : %s\n", BUILD_TIME);
     printf("HTTP server listening on port %d, root dir: %s\n", port, root_dir);
 
     while (1) {
