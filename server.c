@@ -59,7 +59,7 @@ static void *client_thread(void *arg) {
     if (!header_end) {
         // Za długie nagłówki albo brak końca
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         close(client_fd);
         return NULL;
     }
@@ -68,7 +68,7 @@ static void *client_thread(void *arg) {
     char method[8], url_path[1024], version[16];
     if (sscanf(buf, "%7s %1023s %15s", method, url_path, version) != 3) {
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         close(client_fd);
         return NULL;
     }
@@ -76,7 +76,7 @@ static void *client_thread(void *arg) {
     // Prosta walidacja wersji
     if (strcmp(version, "HTTP/1.0") && strcmp(version, "HTTP/1.1")) {
         const char *msg = "HTTP Version Not Supported\r\n";
-        send_simple_response(client_fd, 505, "HTTP Version Not Supported", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 505, "HTTP Version Not Supported", "text/plain", msg, strlen(msg));
         close(client_fd);
         return NULL;
     }
@@ -85,7 +85,7 @@ static void *client_thread(void *arg) {
     char *headers_start = strstr(buf, "\r\n");
     if (!headers_start) {
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         close(client_fd);
         return NULL;
     }
@@ -110,7 +110,7 @@ static void *client_thread(void *arg) {
         handle_delete(client_fd, root_dir, url_path);
     } else {
         const char *msg = "Method Not Allowed\r\n";
-        send_simple_response(client_fd, 405, "Method Not Allowed", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 405, "Method Not Allowed", "text/plain", msg, strlen(msg));
     }
 
     close(client_fd);

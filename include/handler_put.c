@@ -19,7 +19,7 @@ void handle_put(int client_fd,
     if (content_length < 0)
     {
         const char *msg = "Length Required\r\n";
-        send_simple_response(client_fd, 411, "Length Required", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 411, "Length Required", "text/plain", msg, strlen(msg));
         return;
     }
 
@@ -27,7 +27,7 @@ void handle_put(int client_fd,
     if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0)
     {
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         return;
     }
 
@@ -37,7 +37,7 @@ void handle_put(int client_fd,
     if (fd < 0)
     {
         const char *msg = "Internal Server Error\r\n";
-        send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
         return;
     }
 
@@ -52,7 +52,7 @@ void handle_put(int client_fd,
         {
             close(fd);
             const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
+            send_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
             return;
         }
         remaining -= w;
@@ -66,7 +66,7 @@ void handle_put(int client_fd,
         {
             close(fd);
             const char *msg = "Bad Request\r\n";
-            send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+            send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
             return;
         }
         ssize_t w = write(fd, buf, r);
@@ -74,7 +74,7 @@ void handle_put(int client_fd,
         {
             close(fd);
             const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
+            send_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
             return;
         }
         remaining -= r;
@@ -85,11 +85,11 @@ void handle_put(int client_fd,
     if (existed_before)
     {
         // Nadpisano
-        send_simple_response(client_fd, 200, "OK", "text/plain", "OK\r\n", 4);
+        send_response(client_fd, 200, "OK", "text/plain", "OK\r\n", 4);
     }
     else
     {
         // Utworzono nowy plik
-        send_simple_response(client_fd, 201, "Created", "text/plain", "Created\r\n", 9);
+        send_response(client_fd, 201, "Created", "text/plain", "Created\r\n", 9);
     }
 }

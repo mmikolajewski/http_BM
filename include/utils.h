@@ -10,7 +10,7 @@ int build_full_path(const char *root_dir,
                     const char *url_path,
                     char *out, size_t out_size);
 
-void send_simple_response(int fd,
+void send_response(int fd,
                           int status_code,
                           const char *reason,
                           const char *content_type,

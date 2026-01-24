@@ -19,7 +19,7 @@ void handle_get_head(int client_fd,
     if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0)
     {
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         return;
     }
 
@@ -27,14 +27,14 @@ void handle_get_head(int client_fd,
     if (stat(full_path, &st) < 0)
     {
         const char *msg = "Not Found\r\n";
-        send_simple_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
         return;
     }
 
     if (!S_ISREG(st.st_mode))
     {
         const char *msg = "Forbidden\r\n";
-        send_simple_response(client_fd, 403, "Forbidden", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 403, "Forbidden", "text/plain", msg, strlen(msg));
         return;
     }
 
@@ -42,7 +42,7 @@ void handle_get_head(int client_fd,
     if (file_fd < 0)
     {
         const char *msg = "Internal Server Error\r\n";
-        send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
         return;
     }
 

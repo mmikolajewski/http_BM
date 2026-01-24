@@ -3,7 +3,7 @@
 #include <string.h>
 #include <limits.h>
 
-void send_simple_response(int fd,
+void send_response(int fd,
                           int status_code,
                           const char *reason,
                           const char *content_type,

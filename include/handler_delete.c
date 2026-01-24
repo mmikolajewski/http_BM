@@ -16,26 +16,26 @@ void handle_delete(int client_fd,
     if (build_full_path(root_dir, url_path, full_path, sizeof(full_path)) != 0)
     {
         const char *msg = "Bad Request\r\n";
-        send_simple_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
+        send_response(client_fd, 400, "Bad Request", "text/plain", msg, strlen(msg));
         return;
     }
 
     if (unlink(full_path) == 0)
     {
         // 200 OK (można też 204 No Content)
-        send_simple_response(client_fd, 200, "OK", "text/plain", "Deleted\r\n", 9);
+        send_response(client_fd, 200, "OK", "text/plain", "Deleted\r\n", 9);
     }
     else
     {
         if (errno == ENOENT)
         {
             const char *msg = "Not Found\r\n";
-            send_simple_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
+            send_response(client_fd, 404, "Not Found", "text/plain", msg, strlen(msg));
         }
         else
         {
             const char *msg = "Internal Server Error\r\n";
-            send_simple_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
+            send_response(client_fd, 500, "Internal Server Error", "text/plain", msg, strlen(msg));
         }
     }
 }
