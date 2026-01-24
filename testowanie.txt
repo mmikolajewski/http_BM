@@ -1,3 +1,30 @@
+###############################
+# PUT - porawne
+
+curl -i -X PUT \
+  -H "Content-Type: application/json" \
+  -d '{"name":"test","value":123}' \
+  http://localhost:8080
+
+###############################
+# DELETE - porawne, nowy plik
+
+curl -o /dev/null -s -w "%{http_code}\n" -X DELETE http://localhost:8080/
+
+###############################
+# DELETE - error 404
+
+curl -o /dev/null -s -w "%{http_code}\n" -X DELETE http://localhost:8080/123ad
+
+###############################
+# DELETE - error 400
+
+curl -i -X DELETE http://localhost:8080/somepath \
+  -H "X-Long-Header: $(python3 - <<'PY'
+import sys
+print("A" * 8400)
+PY
+)"
 
 
 
