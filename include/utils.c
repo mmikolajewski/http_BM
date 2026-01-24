@@ -13,7 +13,7 @@ void send_response(int fd,
     char header[512];
     int n = snprintf(header, sizeof(header),
                      "HTTP/1.1 %d %s\r\n"
-                     "Server: SimpleCServer/0.1\r\n"
+                     "Server: MegaTurboHiperServer/162364.59233\r\n"
                      "Connection: close\r\n"
                      "Content-Length: %zu\r\n"
                      "%s%s\r\n",
